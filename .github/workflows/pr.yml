@@ -2,7 +2,7 @@ name: Build Automation
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master","fix_build" ]
   pull_request:
     branches: [ "*" ]
 
