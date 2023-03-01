@@ -30,7 +30,7 @@ public abstract class TestJMeterUtils {
         }
 
         JMeterUtils.loadJMeterProperties(dst.getAbsolutePath());
-        JMeterUtils.setLocale(new Locale("ignoreResources"));
+        JMeterUtils.setLocale(new Locale("en"));
 
         JMeterTreeModel jMeterTreeModel = new JMeterTreeModel();
         JMeterTreeListener jMeterTreeListener = new JMeterTreeListener();
