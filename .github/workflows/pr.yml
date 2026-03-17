@@ -10,9 +10,48 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  maven:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
 
+    - name: Check for non-site changes
+      id: filter
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+        else
+          BASE=${{ github.event.before }}
+          HEAD=${{ github.sha }}
+        fi
+        CHANGED=$(git diff --name-only "$BASE" "$HEAD" -- . ':!site/' ':!examples/' | head -1)
+        if [ -n "$CHANGED" ]; then
+          echo "run=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "run=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - uses: actions/setup-java@v4
+      if: steps.filter.outputs.run == 'true'
+      with:
+        distribution: temurin
+        java-version: '11'
+        cache: maven
+
+    - name: Maven tests
+      if: steps.filter.outputs.run == 'true'
+      run: mvn -T 1C -Djava.awt.headless=true -Dmaven.test.redirectTestOutputToFile=true --fail-at-end --batch-mode org.jacoco:jacoco-maven-plugin:prepare-agent test org.jacoco:jacoco-maven-plugin:report install
+
+    - name: Codecov
+      if: steps.filter.outputs.run == 'true'
+      uses: codecov/codecov-action@v5
+
+  site:
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
 
@@ -25,20 +64,6 @@ jobs:
     - name: Prepare upload
       run: ./prepare-upload.sh
 
-    - uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: '11'
-        cache: maven
-
-    - name: Maven tests
-      run: mvn -T 1C -Djava.awt.headless=true -Dmaven.test.redirectTestOutputToFile=true --fail-at-end --batch-mode org.jacoco:jacoco-maven-plugin:prepare-agent test org.jacoco:jacoco-maven-plugin:report install
-      # working-directory: ./plugins/dummy
-
-    - name: Codecov
-      uses: codecov/codecov-action@v5
-
     - name: Perform upload
       run: 'curl --fail -vk https://jmeter-plugins.org/unzip.php -F "zipfile=@upload/site.zip" -H "Authorization: Bearer ${{ secrets.UPLOAD_TOKEN }}"'
       if: github.ref == 'refs/heads/master'
-
